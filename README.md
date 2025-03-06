@@ -66,7 +66,8 @@
    - 거래량 변화율을 기준으로 코인들의 트렌드를 예측하고, 시장에서 차지하는 점유율 변화를 모니터링합니다.
 
 ### 1️⃣ 거래량 급등 코인 분석 (Trading Volume Growth)  
-`WITH daily_volume AS (  
+```sql
+WITH daily_volume AS (  
     SELECT DATE(last_updated) AS date, symbol,  
            SUM(total_volume) AS total_volume  
     FROM market_data  
@@ -109,7 +110,8 @@ LIMIT 10;`
 ---
 
 ### ✅ 최종 SQL 필터링 적용  
-`SELECT *  
+```sql
+SELECT *  
 FROM volume_change  
 WHERE (total_volume - prev_volume) > 120000000  -- 최소 거래량 변화 금액 1.2억 이상  
 ORDER BY volume_growth DESC;`
