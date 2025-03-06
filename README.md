@@ -1,127 +1,121 @@
-# 🚀 가상자산 데이터 분석 프로젝트
+## 📌 1. 데이터 분석의 목적  
 
-## 📌 1. 프로젝트 개요
-**이 프로젝트는 가상자산 거래소의 데이터를 기반으로 데이터 마트를 구축하고, 이를 분석하여 이상 거래 탐지 및 시장 트렌드 분석을 수행하는 것입니다.**  
-**또한, 분석 결과를 Redash를 통해 시각화하여 운영팀이 실무에서 활용할 수 있도록 합니다.**
+### 🎯 가상자산 거래소 운영팀의 핵심 과제  
 
----
+1️⃣ **시장 트렌드 모니터링**: 어떤 코인의 거래량이 급등하고 있는가?  
+3️⃣ **Pump & Dump 사기 감지**: 특정 코인이 급등 후 급락하는 패턴이 있는가?  
 
-## 📌 2. 분석 목적
-### 🎯 **가상자산 거래소 운영팀의 핵심 과제**
-1️⃣ **시장 트렌드 모니터링:** 어떤 코인의 거래량이 급등하고 있는가?  
-2️⃣ **이상 거래 탐지:** 특정 시간대에 비정상적으로 높은 거래가 발생하는가?  
-3️⃣ **Pump & Dump 사기 감지:** 특정 코인이 급등 후 급락하는 패턴이 있는가?  
-4️⃣ **매수 vs 매도 패턴 분석:** 현재 시장에서 매수와 매도가 어떻게 이루어지고 있는가?
-
-✅ 이를 위해, 데이터 마트를 구축하고 SQL 분석을 수행하여 운영팀이 즉시 활용할 수 있도록 정리합니다.
+✅ 이를 위해, **데이터 마트를 구축하고 SQL 분석을 수행**하여 운영팀이 즉시 활용할 수 있도록 정리합니다.
 
 ---
 
-## 📌 3. 데이터 마트 구축 & 정합성 검증
-### ✅ 데이터 마트 테이블 설계
-#### `trades` 테이블 (거래 데이터)
-```sql
-CREATE TABLE trades (
-    trade_id SERIAL PRIMARY KEY,
-    binance_trade_id BIGINT UNIQUE,
-    price DECIMAL(18,8),
-    quantity DECIMAL(18,8),
-    quote_quantity DECIMAL(18,8),
-    trade_time TIMESTAMP,
-    is_buyer_maker BOOLEAN
-);
-```
-#### `market_data` 테이블 (시장 데이터)
-```sql
-CREATE TABLE market_data (
-    market_id SERIAL PRIMARY KEY,
-    coin_id VARCHAR(50),
-    symbol VARCHAR(20),
-    current_price DECIMAL(18,8),
-    high_24h DECIMAL(18,8),
-    low_24h DECIMAL(18,8),
-    total_volume DECIMAL(24,8),
-    market_cap DECIMAL(24,8),
-    last_updated TIMESTAMP
-);
-```
+## 📌 2. 데이터 정합성 검증  
 
-### ✅ 데이터 정합성 검증
-```sql
--- 중복 데이터 확인
-SELECT coin_id, COUNT(*) FROM market_data GROUP BY coin_id HAVING COUNT(*) > 1;
+### ✅ 데이터 정합성 검증 과정  
 
--- NULL 값 탐지
-SELECT * FROM market_data WHERE current_price IS NULL OR market_cap IS NULL;
+#### 🔍 중복 데이터 확인  
+`SELECT coin_id, COUNT(*) FROM market_data GROUP BY coin_id HAVING COUNT(*) > 1;`
 
--- 이상 데이터 탐지 (비정상적인 가격 데이터)
-SELECT * FROM market_data WHERE current_price <= 0 OR market_cap <= 0;
-```
-✅ **정합성 검증 결과:**  
-✅ 중복 없음 / ✅ NULL 없음 / ✅ 이상 데이터 없음 🎉  
+#### 🔍 NULL 값 탐지  
+`SELECT * FROM market_data WHERE current_price IS NULL OR market_cap IS NULL;`
+
+#### 🔍 이상 데이터 탐지 (비정상적인 가격 데이터)  
+`SELECT * FROM market_data WHERE current_price <= 0 OR market_cap <= 0;`
+
+### ✅ 정합성 검증 결과:  
+- ✅ **중복 없음**  
+- ✅ **NULL 없음**  
+- ✅ **이상 데이터 없음** 🎉  
 
 ---
 
-## 📌 4. 핵심 데이터 분석 & SQL 구현
+## 📌 3. 핵심 데이터 분석  
 
-### **1️⃣ 거래량 급등 코인 분석 (Trading Volume Growth)**
-```sql
-SELECT symbol, total_volume,
-       LAG(total_volume) OVER (ORDER BY last_updated) AS prev_volume,
-       ROUND((total_volume - LAG(total_volume) OVER (ORDER BY last_updated)) / NULLIF(LAG(total_volume) OVER (ORDER BY last_updated), 0) * 100, 2) AS volume_growth
-FROM market_data
-ORDER BY volume_growth DESC
-LIMIT 10;
-```
-📌 **활용:** 🚀 **거래량이 급등한 코인을 실시간으로 감지하여 마케팅 & 신규 투자 기회 제공**  
+### 📌 3-1. Pump & Dump 사기 감지  
 
----
+### 🎯 분석 목적  
+- **Pump & Dump 사기**는 특정 코인이 급등 후 급락하는 패턴을 보일 때 발생하는 시장의 비정상적인 움직임을 의미합니다.  
+- 이 패턴을 감지하여 사기를 방지하고, 투자자에게 유용한 실시간 정보를 제공합니다.
 
-### **2️⃣ 매수 vs 매도 패턴 분석 (Buyer vs Seller Activity)**
-```sql
-SELECT is_buyer_maker, COUNT(*) AS trade_count, 
-       ROUND( COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 2) AS trade_percentage
-FROM trades
-GROUP BY is_buyer_maker;
-```
-📌 **활용:**
-- `is_buyer_maker = TRUE` → 매수 측에서 거래한 횟수  
-- `is_buyer_maker = FALSE` → 매도 측에서 거래한 횟수  
-- 🚀 **시장 참여자들이 매수/매도를 어느 쪽에서 더 많이 하고 있는지 분석 가능!**  
+### 🔍 분석 방법  
+1. **코인 거래량 급등과 급락 시점 분석**  
+   급등 후 급락하는 패턴을 감지하기 위해, 거래량과 가격 변동을 시간대별로 분석합니다. 급격한 가격 변화가 일어난 시점을 찾아냅니다.  
+   
+2. **이상적인 패턴을 찾기 위한 규칙 설정**  
+   - 거래량이 급격하게 증가한 후, 가격이 급락하는 패턴을 찾습니다.
+   - 일정 시간 이내에 급격한 상승과 하락을 동시에 나타내는 코인을 'pump & dump'으로 판단합니다.
+
+### ✅ 결과  
+- **이상 거래 감지**: 특정 코인의 거래량 급등 후 급락 패턴을 정확히 감지하여, 시장에서의 비정상적인 활동을 파악할 수 있습니다.  
+- **경고 시스템**: 실시간으로 'pump & dump' 패턴을 감지하고 경고 시스템을 구축하여, 투자자에게 위험을 알릴 수 있는 기회를 제공합니다.
 
 ---
 
-### **3️⃣ Pump & Dump 패턴 감지**
-```sql
-WITH price_change AS (
-    SELECT symbol, 
-           last_updated,
-           current_price,
-           LAG(current_price) OVER (PARTITION BY symbol ORDER BY last_updated) AS prev_price,
-           (current_price - LAG(current_price) OVER (PARTITION BY symbol ORDER BY last_updated)) / NULLIF(LAG(current_price) OVER (PARTITION BY symbol ORDER BY last_updated), 0) * 100 AS price_change_pct
-    FROM market_data
-)
-SELECT symbol, last_updated, current_price, price_change_pct
-FROM price_change
-WHERE price_change_pct > 50 OR price_change_pct < -50  
-ORDER BY ABS(price_change_pct) DESC;
-```
-📌 **활용:** 🚨 **Pump & Dump(펌핑 후 덤핑) 가능성이 높은 코인 감지하여 금융 사기 방지**
+### 📌 3-2. 시장 트렌드 모니터링  
+
+### 🎯 분석 목적  
+- **시장 트렌드 모니터링**은 특정 코인의 거래량 변화와 시장 트렌드를 파악하여, 투자자에게 유망한 투자처를 안내할 수 있도록 돕습니다.  
+- 다양한 코인의 시장 상황을 종합적으로 분석하여 트렌드를 예측합니다.
+
+### 🔍 분석 방법  
+1. **거래량 급등 코인 분석**  
+   - 시장에서 급격히 거래량이 증가하는 코인을 실시간으로 분석하여, 현재 투자자들이 주목하는 코인들을 파악합니다.  
+   - 거래량 급증 시점과 함께 상승률을 고려하여, 유망한 코인을 선별합니다.
+
+2. **거래량 증가율 및 시장 점유율 분석**  
+   - 거래량 변화율을 기준으로 코인들의 트렌드를 예측하고, 시장에서 차지하는 점유율 변화를 모니터링합니다.
+
+### 1️⃣ 거래량 급등 코인 분석 (Trading Volume Growth)  
+`WITH daily_volume AS (  
+    SELECT DATE(last_updated) AS date, symbol,  
+           SUM(total_volume) AS total_volume  
+    FROM market_data  
+    GROUP BY DATE(last_updated), symbol  
+),  
+volume_change AS (  
+    SELECT date, symbol, total_volume,  
+           LAG(total_volume) OVER (PARTITION BY symbol ORDER BY date) AS prev_volume,  
+           ROUND((total_volume - LAG(total_volume) OVER (PARTITION BY symbol ORDER BY date)) /  
+                 NULLIF(LAG(total_volume) OVER (PARTITION BY symbol ORDER BY date), 0) * 100, 2) AS volume_growth  
+    FROM daily_volume  
+)  
+SELECT date, symbol, total_volume, prev_volume, volume_growth  
+FROM volume_change  
+WHERE prev_volume IS NOT NULL  
+ORDER BY volume_growth DESC  
+LIMIT 10;`
+
+### 2️⃣ 거래량 급등 필터링 & 최적화  
+
+#### ✅ 데이터 분석 결과  
+단순 거래량 증가율(%)만 보면 전체 시장 상황을 반영하지 않을 수 있음.  
+
+**예제:**  
+- 거래량이 원래 낮았던 코인이 소폭 증가해도 높은 증가율로 보일 수 있음.  
+- BTC처럼 원래 거래량이 높은 코인은 상대적으로 변화율이 낮을 가능성이 큼.  
+
+✅ **따라서, 거래량 변화 금액(절대값)도 함께 고려해야 더 Insightful 함.**  
 
 ---
 
-## 📌 5. Redash를 활용한 데이터 시각화
-### **운영팀이 실시간 모니터링할 대시보드 구성**
-| **Redash 차트 유형** | **시각화할 분석** |
-|-----------------|------------------|
-| 📊 **Bar Chart** | 최근 거래량 급등 코인 순위 |
-| 📉 **Line Chart** | 특정 코인의 이동 평균 vs 실시간 가격 비교 |
-| 🔥 **Heatmap Chart** | 특정 시간대 매수/매도 비율 변화 분석 |
-| 🕯 **Candlestick Chart** | Pump & Dump 패턴이 발생한 코인 분석 |
+### 🚀 최적의 필터링 기준  
+1️⃣ **거래량 변화 금액이 1.2억 이상인 경우만 유지**  
+   ✅ 의미 있는 변동이 포함되면서도 너무 많은 코인을 걸러내지 않음.  
+   ✅ 대형 코인만 남는 문제를 방지하면서, 실제 상승 트렌드를 반영함.  
+
+2️⃣ **거래량 증가율은 높은 순서로 정렬**  
+   ✅ 증가율이 높은 코인을 투자자들에게 강조할 수 있도록 필터링하지 않고 정렬만 수행.  
 
 ---
 
-## 📌 6. 결론 및 적용 방안
-✅ **거래소 운영팀이 실시간으로 거래 데이터 이상 탐지 가능**  
-✅ **Wash Trading, Pump & Dump 사기 방지 가능**  
-✅ **Redash 대시보드를 활용해 데이터 기반 의사 결정 가능**  
+### ✅ 최종 SQL 필터링 적용  
+`SELECT *  
+FROM volume_change  
+WHERE (total_volume - prev_volume) > 120000000  -- 최소 거래량 변화 금액 1.2억 이상  
+ORDER BY volume_growth DESC;`
+
+### ✅ 결과  
+- **상위 코인 선별**: 급격히 거래량이 증가한 코인을 모니터링하여, 투자자들에게 시장에서 주목받고 있는 유망 코인을 추천할 수 있습니다.  
+- **시장 동향 파악**: 시장의 주요 트렌드를 실시간으로 파악하여, 빠르게 변동하는 시장에서 유리한 포지션을 선점할 수 있습니다.
+
+---
