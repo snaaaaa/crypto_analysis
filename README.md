@@ -84,7 +84,7 @@ SELECT date, symbol, total_volume, prev_volume, volume_growth
 FROM volume_change  
 WHERE prev_volume IS NOT NULL  
 ORDER BY volume_growth DESC  
-LIMIT 10;
+LIMIT 10;```
 
 ### 2️⃣ 거래량 급등 필터링 & 최적화  
 
@@ -114,7 +114,7 @@ LIMIT 10;
 SELECT *  
 FROM volume_change  
 WHERE (total_volume - prev_volume) > 120000000  -- 최소 거래량 변화 금액 1.2억 이상  
-ORDER BY volume_growth DESC;
+ORDER BY volume_growth DESC;```
 
 ### ✅ 결과  
 - **상위 코인 선별**: 급격히 거래량이 증가한 코인을 모니터링하여, 투자자들에게 시장에서 주목받고 있는 유망 코인을 추천할 수 있습니다.  
