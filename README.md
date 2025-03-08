@@ -53,6 +53,7 @@ CREATE TABLE coin_statistics (
   - `market_down_percentage` (DOUBLE PRECISION): 하락 코인의 비율
 
 ```sql
+-- trend_analysis 테이블 생성
 CREATE TABLE trend_analysis (
     timestamp TIMESTAMP NOT NULL,       -- 거래 시간
     total_market_cap DOUBLE PRECISION NOT NULL, -- 전체 시장 시가총액
@@ -61,13 +62,32 @@ CREATE TABLE trend_analysis (
 );
 
 -- 상위 1개 코인마다 시가총액과 상승/하락 비율을 계산합니다.
+WITH price_changes AS (
+    SELECT 
+        coin_id,
+        timestamp,
+        price,
+        volume,
+        LAG(price) OVER (PARTITION BY coin_id ORDER BY timestamp) AS prev_price,
+        CASE 
+            WHEN price > LAG(price) OVER (PARTITION BY coin_id ORDER BY timestamp) THEN 1 
+            ELSE 0 
+        END AS market_up,
+        CASE 
+            WHEN price < LAG(price) OVER (PARTITION BY coin_id ORDER BY timestamp) THEN 1 
+            ELSE 0 
+        END AS market_down
+    FROM coin_statistics
+    WHERE timestamp >= '2025-03-07 00:00:00' 
+      AND timestamp < '2025-03-08 00:00:00'
+)
 INSERT INTO trend_analysis (timestamp, total_market_cap, market_up_percentage, market_down_percentage)
 SELECT 
     timestamp,
     SUM(price * volume) AS total_market_cap,
-    (SUM(CASE WHEN price > LAG(price) OVER (PARTITION BY coin_id ORDER BY timestamp) THEN 1 ELSE 0 END) / COUNT(*)) * 100 AS market_up_percentage,
-    (SUM(CASE WHEN price < LAG(price) OVER (PARTITION BY coin_id ORDER BY timestamp) THEN 1 ELSE 0 END) / COUNT(*)) * 100 AS market_down_percentage
-FROM coin_statistics
+    (SUM(market_up) / COUNT(*)) * 100 AS market_up_percentage,  -- 상승 비율
+    (SUM(market_down) / COUNT(*)) * 100 AS market_down_percentage -- 하락 비율
+FROM price_changes
 GROUP BY timestamp
 ORDER BY timestamp;
 ```
