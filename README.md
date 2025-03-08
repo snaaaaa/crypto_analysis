@@ -1,123 +1,137 @@
-## 📌 1. 데이터 분석의 목적  
+# 📊 **암호화폐 대시보드 구축 프로젝트**
 
-### 🎯 가상자산 거래소 운영팀의 핵심 과제  
+# 📊 **암호화폐 대시보드 데이터 마트 구조**
 
-1️⃣ **시장 트렌드 모니터링**: 어떤 코인의 거래량이 급등하고 있는가?  
-3️⃣ **Pump & Dump 사기 감지**: 특정 코인이 급등 후 급락하는 패턴이 있는가?  
+## 1️⃣ **원본 테이블 (Staging Table)**
 
-✅ 이를 위해, **데이터 마트를 구축하고 SQL 분석을 수행**하여 운영팀이 즉시 활용할 수 있도록 정리합니다.
-
----
-
-## 📌 2. 데이터 정합성 검증  
-
-### ✅ 데이터 정합성 검증 과정  
-
-#### 🔍 중복 데이터 확인  
-`SELECT coin_id, COUNT(*) FROM market_data GROUP BY coin_id HAVING COUNT(*) > 1;`
-
-#### 🔍 NULL 값 탐지  
-`SELECT * FROM market_data WHERE current_price IS NULL OR market_cap IS NULL;`
-
-#### 🔍 이상 데이터 탐지 (비정상적인 가격 데이터)  
-`SELECT * FROM market_data WHERE current_price <= 0 OR market_cap <= 0;`
-
-### ✅ 정합성 검증 결과:  
-- ✅ **중복 없음**  
-- ✅ **NULL 없음**  
-- ✅ **이상 데이터 없음** 🎉  
+### 🏦 **`coin_statistics` 테이블**
+- **목표**: 실시간 거래 데이터를 수집하여 기본 데이터의 원천으로 사용.
+- **주요 컬럼**:
+  - `coin_id` (VARCHAR): 코인의 고유 ID
+  - `timestamp` (TIMESTAMP): 거래 시간
+  - `price` (DOUBLE PRECISION): 코인 가격
+  - `market_cap` (DOUBLE PRECISION): 시가총액
+  - `volume` (DOUBLE PRECISION): 거래량
+  - `circulating_supply` (DOUBLE PRECISION): 유통량
+  - `total_supply` (DOUBLE PRECISION): 전체 공급량
 
 ---
 
-## 📌 3. 핵심 데이터 분석  
+## 2️⃣ **집계된 데이터 테이블 (Aggregated Tables)**
 
-### 📌 3-1. Pump & Dump 사기 감지  
-
-### 🎯 분석 목적  
-- **Pump & Dump 사기**는 특정 코인이 급등 후 급락하는 패턴을 보일 때 발생하는 시장의 비정상적인 움직임을 의미합니다.  
-- 이 패턴을 감지하여 사기를 방지하고, 투자자에게 유용한 실시간 정보를 제공합니다.
-
-### 🔍 분석 방법  
-1. **코인 거래량 급등과 급락 시점 분석**  
-   급등 후 급락하는 패턴을 감지하기 위해, 거래량과 가격 변동을 시간대별로 분석합니다. 급격한 가격 변화가 일어난 시점을 찾아냅니다.  
-   
-2. **이상적인 패턴을 찾기 위한 규칙 설정**  
-   - 거래량이 급격하게 증가한 후, 가격이 급락하는 패턴을 찾습니다.
-   - 일정 시간 이내에 급격한 상승과 하락을 동시에 나타내는 코인을 'pump & dump'으로 판단합니다.
-
-### ✅ 결과  
-- **이상 거래 감지**: 특정 코인의 거래량 급등 후 급락 패턴을 정확히 감지하여, 시장에서의 비정상적인 활동을 파악할 수 있습니다.  
-- **경고 시스템**: 실시간으로 'pump & dump' 패턴을 감지하고 경고 시스템을 구축하여, 투자자에게 위험을 알릴 수 있는 기회를 제공합니다.
+### 💹 **`trend_analysis` 테이블**
+- **목표**: 전체 시장의 **상승/하락 비율**과 **시가총액 변화를 추적**하여 분석합니다.
+- **주요 컬럼**:
+  - `timestamp` (TIMESTAMP): 거래 시간
+  - `total_market_cap` (DOUBLE PRECISION): 전체 시장 시가총액
+  - `market_up_percentage` (DOUBLE PRECISION): 상승 코인의 비율
+  - `market_down_percentage` (DOUBLE PRECISION): 하락 코인의 비율
 
 ---
 
-### 📌 3-2. 시장 트렌드 모니터링  
+### 📈 **`top_price_change_7d` 테이블**
+- **목표**: 7일 동안의 **가격 변동률**을 계산하고 **상위 5개 코인**을 추적합니다. 이때, **IQR 방식**으로 거래량의 **이상치**를 제외합니다.
+- **주요 컬럼**:
+  - `coin_id` (VARCHAR): 코인 ID
+  - `price_change_7d` (DOUBLE PRECISION): 7일 가격 변동률
+  - `market_cap` (DOUBLE PRECISION): 시가총액
+  - `volume` (DOUBLE PRECISION): 거래량
 
-### 🎯 분석 목적  
-- **시장 트렌드 모니터링**은 특정 코인의 거래량 변화와 시장 트렌드를 파악하여, 투자자에게 유망한 투자처를 안내할 수 있도록 돕습니다.  
-- 다양한 코인의 시장 상황을 종합적으로 분석하여 트렌드를 예측합니다.
+---
 
-### 🔍 분석 방법  
-1. **거래량 급등 코인 분석**  
-   - 시장에서 급격히 거래량이 증가하는 코인을 실시간으로 분석하여, 현재 투자자들이 주목하는 코인들을 파악합니다.  
-   - 거래량 급증 시점과 함께 상승률을 고려하여, 유망한 코인을 선별합니다.
+### 📅 **`hourly_volume` 테이블**
+- **목표**: **시간대별 거래량**을 추적하여 마케팅 캠페인 시간을 최적화합니다.
+- **주요 컬럼**:
+  - `hour` (INT): 시간대 (0~23)
+  - `total_volume` (DOUBLE PRECISION): 해당 시간대의 총 거래량
 
-2. **거래량 증가율 및 시장 점유율 분석**  
-   - 거래량 변화율을 기준으로 코인들의 트렌드를 예측하고, 시장에서 차지하는 점유율 변화를 모니터링합니다.
+---
 
-### 1️⃣ 거래량 급등 코인 분석 (Trading Volume Growth)  
+## 3️⃣ **Redash에서 실행해야 하는 최종 쿼리**
+
+### 1. **전체 시장 트렌드 분석**
+
+**목표**: 시장 트렌드를 파악하고, **상승/하락하는 코인의 비율**과 **전체 시가총액**을 시각화합니다.
+
 ```sql
-WITH daily_volume AS (  
-    SELECT DATE(last_updated) AS date, symbol,  
-           SUM(total_volume) AS total_volume  
-    FROM market_data  
-    GROUP BY DATE(last_updated), symbol  
-),  
-volume_change AS (  
-    SELECT date, symbol, total_volume,  
-           LAG(total_volume) OVER (PARTITION BY symbol ORDER BY date) AS prev_volume,  
-           ROUND((total_volume - LAG(total_volume) OVER (PARTITION BY symbol ORDER BY date)) /  
-                 NULLIF(LAG(total_volume) OVER (PARTITION BY symbol ORDER BY date), 0) * 100, 2) AS volume_growth  
-    FROM daily_volume  
-)  
-SELECT date, symbol, total_volume, prev_volume, volume_growth  
-FROM volume_change  
-WHERE prev_volume IS NOT NULL  
-ORDER BY volume_growth DESC  
-LIMIT 10;```
+SELECT 
+    timestamp,
+    SUM(price * volume) AS total_market_cap,
+    (SUM(CASE WHEN price > LAG(price) OVER (PARTITION BY coin_id ORDER BY timestamp) THEN 1 ELSE 0 END) / COUNT(*)) * 100 AS market_up_percentage,
+    (SUM(CASE WHEN price < LAG(price) OVER (PARTITION BY coin_id ORDER BY timestamp) THEN 1 ELSE 0 END) / COUNT(*)) * 100 AS market_down_percentage
+FROM coin_statistics
+GROUP BY timestamp
+ORDER BY timestamp;
 
-### 2️⃣ 거래량 급등 필터링 & 최적화  
+파이 차트: 상승/하락 비율을 계산하여 파이 차트로 표시
+라인 차트: 전체 시가총액 변화를 라인 차트로 표시
 
-#### ✅ 데이터 분석 결과  
-단순 거래량 증가율(%)만 보면 전체 시장 상황을 반영하지 않을 수 있음.  
+### 2. **7일 가격 변동률 상위 5개 코인**
+목표: 7일 동안의 가격 변동률을 계산하고 상위 5개 코인을 추출합니다. 이때, IQR 방식으로 거래량의 이상치를 제외합니다.
 
-**예제:**  
-- 거래량이 원래 낮았던 코인이 소폭 증가해도 높은 증가율로 보일 수 있음.  
-- BTC처럼 원래 거래량이 높은 코인은 상대적으로 변화율이 낮을 가능성이 큼.  
-
-✅ **따라서, 거래량 변화 금액(절대값)도 함께 고려해야 더 Insightful 함.**  
-
----
-
-### 🚀 최적의 필터링 기준  
-1️⃣ **거래량 변화 금액이 1.2억 이상인 경우만 유지**  
-   ✅ 의미 있는 변동이 포함되면서도 너무 많은 코인을 걸러내지 않음.  
-   ✅ 대형 코인만 남는 문제를 방지하면서, 실제 상승 트렌드를 반영함.  
-
-2️⃣ **거래량 증가율은 높은 순서로 정렬**  
-   ✅ 증가율이 높은 코인을 투자자들에게 강조할 수 있도록 필터링하지 않고 정렬만 수행.  
-
----
-
-### ✅ 최종 SQL 필터링 적용  
 ```sql
-SELECT *  
-FROM volume_change  
-WHERE (total_volume - prev_volume) > 120000000  -- 최소 거래량 변화 금액 1.2억 이상  
-ORDER BY volume_growth DESC;```
+복사
+WITH volume_stats AS (
+    SELECT
+        coin_id,
+        PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY volume) AS q1,
+        PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY volume) AS q3
+    FROM coin_statistics
+    WHERE timestamp BETWEEN NOW() - INTERVAL '7 days' AND NOW()
+    GROUP BY coin_id
+),
+filtered_data AS (
+    SELECT
+        cs.coin_id,
+        cs.price,
+        cs.timestamp,
+        cs.market_cap,
+        cs.volume,
+        LAG(cs.price) OVER (PARTITION BY cs.coin_id ORDER BY cs.timestamp) AS prev_price
+    FROM coin_statistics cs
+    WHERE cs.timestamp BETWEEN NOW() - INTERVAL '7 days' AND NOW()
+)
+SELECT 
+    fd.coin_id,
+    (fd.price - fd.prev_price) / fd.prev_price * 100 AS price_change_7d,  -- 7일 변동률
+    fd.market_cap,
+    fd.volume
+FROM filtered_data fd
+JOIN volume_stats vs
+    ON fd.coin_id = vs.coin_id
+WHERE fd.volume BETWEEN vs.q1 - 1.5 * (vs.q3 - vs.q1) AND vs.q3 + 1.5 * (vs.q3 - vs.q1)
+ORDER BY price_change_7d DESC
+LIMIT 5;
 
-### ✅ 결과  
-- **상위 코인 선별**: 급격히 거래량이 증가한 코인을 모니터링하여, 투자자들에게 시장에서 주목받고 있는 유망 코인을 추천할 수 있습니다.  
-- **시장 동향 파악**: 시장의 주요 트렌드를 실시간으로 파악하여, 빠르게 변동하는 시장에서 유리한 포지션을 선점할 수 있습니다.
+테이블 차트: 상위 5개 코인의 가격 변동률, 거래량, 시가총액을 표시
+IQR 필터링: 거래량이 과도하게 작은 코인 제외
+### 3. **시간대별 거래량 변화**
+목표: 거래량이 많은 시간대를 추적하여 마케팅 전략을 최적화합니다.
 
----
+```sql
+SELECT 
+    EXTRACT(HOUR FROM timestamp) AS hour,
+    SUM(volume) AS total_volume
+FROM coin_statistics
+WHERE timestamp BETWEEN NOW() - INTERVAL '7 days' AND NOW()
+GROUP BY hour
+ORDER BY hour;
+라인 차트: 시간대별 거래량 변화를 표시하여 가장 거래량이 많은 시간대를 파악
+4️⃣ 데이터 마트 테이블 관계도
+📑 테이블	📋 설명
+coin_statistics	실시간 거래 기록 (가격, 시가총액, 거래량 등)
+trend_analysis	전체 시장 트렌드 분석 (상승/하락 비율, 시가총액)
+top_price_change_7d	7일 가격 변동률 상위 5개 코인 분석 (IQR 필터링 포함)
+hourly_volume	시간대별 거래량 분석
+🚀 데이터 마트 구축 목표
+효율적인 분석을 위한 데이터 집계: 거래량, 시가총액, 가격 변동률 등을 주기적으로 집계하여 대시보드에서 빠르게 조회하고 시각화할 수 있도록 준비합니다.
+이상치 필터링: IQR 방식으로 이상치를 제외하고, 과도한 변동을 제거하여 더 정확한 분석을 제공합니다.
+시각화 및 대시보드: 집계된 데이터를 Redash나 다른 시각화 도구에서 사용할 수 있도록 저장하여 마케팅팀이 필요한 정보를 실시간으로 확인할 수 있도록 합니다.
+📌 결론
+원본 테이블 (coin_statistics): 실시간 거래 데이터를 기록합니다.
+집계된 테이블:
+trend_analysis: 시장 트렌드 분석 (시가총액 및 상승/하락 비율)
+top_price_change_7d: 7일 가격 변동률 상위 5개 코인
+hourly_volume: 시간대별 거래량 분석
+이 구조를 통해 효율적인 데이터 집계와 정확한 분석을 지원하고, Redash 대시보드에서 실시간 데이터 분석이 가능하게 됩니다.
+
